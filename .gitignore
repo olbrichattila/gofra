@@ -1,0 +1,9 @@
+database/database.sqlite
+sessions/*
+!sessions/.gitkeep
+log/*
+!log/.gitkeep
+cache/*
+!cache/.gitkeep
+cmd/appwizard/appwizard
+gofra

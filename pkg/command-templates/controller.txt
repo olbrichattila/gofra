@@ -1,0 +1,198 @@
+package controller
+
+import (
+	"fmt"
+	"github.com/olbrichattila/gofra/pkg/app/src/db"
+	"github.com/olbrichattila/gofra/pkg/app/src/request"
+	"github.com/olbrichattila/gofra/pkg/app/src/session"
+	"github.com/olbrichattila/gofra/pkg/app/src/view"
+	"html/template"
+
+	// gosqlbuilder "github.com/olbrichattila/gosqlbuilder"
+	builder "github.com/olbrichattila/gosqlbuilder/pkg"
+)
+
+func TestAction2(r request.Requester) string {
+	return "Hello from test action 2"
+}
+
+type Response struct {
+	Name  string                   `json:"name"`
+	Data  []map[string]interface{} `json:"data"`
+	Error error                    `json:"error"`
+}
+
+func TestAction3(r request.Requester, db db.DBer) Response {
+	resp := Response{Name: "Vehicle makes"}
+	db.Open()
+	defer db.Close()
+	data := db.QueryAll("select make, count(*) as cnt from data group by make")
+	for d := range data {
+		resp.Data = append(resp.Data, d)
+	}
+	lastError := db.GetLastError()
+	if lastError != nil {
+		fmt.Println(lastError.Error())
+	}
+
+	resp.Error = lastError
+
+	return resp
+}
+
+func TestActionModel(r request.Requester, db db.DBer) Response {
+	make := r.GetOne("m", "Mazda")
+	resp := Response{Name: "Vehicle models " + make}
+
+	db.Open()
+	defer db.Close()
+	data := db.QueryAll("select model, count(*) as cnt from data where make = ? group by model", make)
+	for d := range data {
+		resp.Data = append(resp.Data, d)
+	}
+	lastError := db.GetLastError()
+	if lastError != nil {
+		fmt.Println(lastError.Error())
+	}
+
+	resp.Error = lastError
+
+	return resp
+}
+
+func TestAction4(r request.Requester) map[string][]string {
+	return r.All()
+
+	// return Response{Name: "Hello from struct path"}
+}
+
+type PageData struct {
+	Title   string
+	Heading string
+	Content template.HTML
+}
+
+func TestAction5(r request.Requester, v view.Viewer) string {
+	templateFiles := []string{
+		"welcome.html",
+		"template/header.html",
+		"template/footer.html",
+		"template/content.html",
+	}
+
+	data := PageData{
+		Title:   "My Website",
+		Heading: "Welcome to My Website",
+		Content: template.HTML(`<strong>This is the main content of the page.</strong>`),
+	}
+
+	return v.RenderView(templateFiles, data)
+}
+
+type Request = struct {
+	Name string `json:"name"`
+}
+
+func TestAction6(r request.Requester) Request {
+	req := &Request{}
+	r.JSONToStruct(req)
+
+	return *req
+}
+
+func TestAction7(r request.Requester, db db.DBer) (map[string]interface{}, error) {
+	db.Open()
+	defer db.Close()
+
+	// re, err := db.Execute("insert into data (basemodel) values (?)", "FUCK")
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	// fmt.Println(re)
+
+	// re, err := db.Execute("delete from data where basemodel = ?", "FUCK")
+	// if err != nil {
+	// 	return nil, err
+	// }
+	// fmt.Println(re)
+
+	return db.QueryOne("SELECT * FROM data LIMIT 1")
+}
+
+func TestAction8(r request.Requester, db db.DBer, v view.Viewer, sqlBuilder builder.Builder, s session.Sessioner) (string, error) {
+	db.Open()
+	defer db.Close()
+	// fmt.Println(s.Get("userId"))
+
+	// sqlBuilder.Insert("data").
+	// 	Fields("make", "basemodel", "model", "fuel_type").
+	// 	Values("Mazda", "627", "626", "Petrol")
+	// sql, _ := sqlBuilder.AsSQL()
+	// // fmt.Println(sql)
+	// _, err := db.Execute(sql, sqlBuilder.GetParams()...)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+
+	// sqlBuilder.Update("data").
+	// 	Fields("make", "basemodel", "model", "fuel_type").
+	// 	Values("Mazda", "626", "626", "Petrol").
+	// 	Where("make", "=", "Mazda").
+	// 	Where("model", "=", "626")
+
+	// sql, _ = sqlBuilder.AsSQL()
+	// // fmt.Println(sql)
+	// _, err = db.Execute(sql, sqlBuilder.GetParams()...)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+
+	// sqlBuilder.Delete("data").
+	// 	Where("make", "=", "Mazda").
+	// 	Where("model", "=", "626")
+
+	// sql, _ = sqlBuilder.AsSQL()
+	// fmt.Println(sql)
+	// _, err = db.Execute(sql, sqlBuilder.GetParams()...)
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// }
+
+	sqlBuilder.Select("data").
+		Fields("make", "basemodel", "model", "fuel_type").
+		// Where("make", "BMW").
+		Where("make", "=", "Mazda").
+		OrWhereGroup(func(w builder.Where) {
+			w.OrIn("make", "Opel", "BMW")
+		}).
+		// Where("model", "=","MX-5").
+		// Where("model", "=","626").
+		OrderBy("make", "model").
+		GroupBy("make", "basemodel", "model", "fuel_type")
+
+	sql, err := sqlBuilder.AsSQL()
+	if err != nil {
+		return err.Error(), nil
+	}
+	//	fmt.Println(sql)
+
+	report := make([]map[string]interface{}, 0)
+	res := db.QueryAll(sql, sqlBuilder.GetParams()...)
+	if db.GetLastError() != nil {
+		return "", db.GetLastError()
+	}
+	for ret := range res {
+		report = append(report, ret)
+	}
+
+	if db.GetLastError() != nil {
+		return "", db.GetLastError()
+	}
+
+	templateFiles := []string{
+		"brands.html",
+	}
+
+	return v.RenderView(templateFiles, report), nil
+}

@@ -106,7 +106,7 @@ It will create:
 package command
 
 import (
-	"framework/internal/app/args"
+	"github.com/olbrichattila/gofra/pkg/app/args"
 )
 
 // DataListCommand function can take any parameters defined in the Di config
@@ -162,10 +162,10 @@ This will create a controller with return parameters string and error, input par
 package controller
 
 import (
-     "framework/internal/app/config"
-     "framework/internal/app/db"
-     "framework/internal/app/logger"
-     "framework/internal/app/mail"
+     "github.com/olbrichattila/gofra/pkg/app/config"
+     "github.com/olbrichattila/gofra/pkg/app/db"
+     "github.com/olbrichattila/gofra/pkg/app/logger"
+     "github.com/olbrichattila/gofra/pkg/app/mail"
 )
 
 // ProductsAction function can take any parameters defined in the Di config
@@ -183,10 +183,10 @@ Generates:
 package controller
 
 import (
-     "framework/internal/app/config"
-     "framework/internal/app/db"
-     "framework/internal/app/logger"
-     "framework/internal/app/mail"
+     "github.com/olbrichattila/gofra/pkg/app/config"
+     "github.com/olbrichattila/gofra/pkg/app/db"
+     "github.com/olbrichattila/gofra/pkg/app/logger"
+     "github.com/olbrichattila/gofra/pkg/app/mail"
 )
 
 // IndexProductsApiAction function can take any parameters defined in the Di config
@@ -224,10 +224,10 @@ Generates:
 package controller
 
 import (
-     "framework/internal/app/config"
-     "framework/internal/app/db"
-     "framework/internal/app/logger"
-     "framework/internal/app/mail"
+     "github.com/olbrichattila/gofra/pkg/app/config"
+     "github.com/olbrichattila/gofra/pkg/app/db"
+     "github.com/olbrichattila/gofra/pkg/app/logger"
+     "github.com/olbrichattila/gofra/pkg/app/mail"
 )
 
 // IndexProductsCrudAction function can take any parameters defined in the Di config
@@ -308,7 +308,7 @@ Generated:
 package job
 
 import (
-     "framework/internal/app/queue"
+     "github.com/olbrichattila/gofra/pkg/app/queue"
 )
 
 // ClearPaymentsJob function can take any parameters defined in the Di config
@@ -410,7 +410,7 @@ It generates: ```app/validator-configs/my-custom-rule.go```
 ```
 package customrule
 
-import "framework/internal/app/validator"
+import "github.com/olbrichattila/gofra/pkg/app/validator"
 
 // MyCustomRule is a custom validator rule,
 // val is the value to validate,
@@ -808,7 +808,7 @@ package eventconsumer
 
 import (
 	"fmt"
-	"framework/internal/app/logger"
+	"github.com/olbrichattila/gofra/pkg/app/logger"
 )
 
 func ExampleConsumer(payload string, l logger.Logger) {
@@ -881,8 +881,8 @@ package controller
 
 import (
 	"fmt"
-	"framework/internal/app/session"
-	"framework/internal/app/validator"
+	"github.com/olbrichattila/gofra/pkg/app/session"
+	"github.com/olbrichattila/gofra/pkg/app/validator"
 )
 
 funcMyControllerAction(s session.Sessioner, val validator.Validator) {
@@ -994,7 +994,7 @@ Example:
 var DiBindings = []config.DiCallback{
 	func(di godi.Container) (string, interface{}, error) {
 		env, err := di.Get(env.New())
-		return "internal.app.env.Enver", env, err
+		return "olbrichattila.gofra.pkg.app.env.Enver", env, err
 	},
 	...
 	...

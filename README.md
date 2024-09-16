@@ -2,6 +2,23 @@
 
 > This framework is work in progress, lot's to come, see todo.txt. including full code cleanup and testing
 
+### Install
+> It is recommended to create a new gofra project with command line tool.
+
+### First install the command line tool:
+```
+go install github.com/olbrichattila/creategofra@latest
+```
+
+Create new framework boilerplate: ```creategofra <projectName>```
+
+> Example:
+```
+creategofra myApplication
+```
+
+The wizard will ask questions regarding your initial setup, like cache, session, log storage, database connection and ports.
+
 ### Available main features.
 - Controllers
 - Middlewares

@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="images/gofra.webp" alt="Description" width="120"/>
+</p>
 # Golang Web Framework 
 
 > This framework is work in progress, lot's to come, see todo.txt. including full code cleanup and testing
@@ -46,7 +49,6 @@ The wizard will ask questions regarding your initial setup, like cache, session,
 
 ## Install:
 ```
-go install github.com/olbrichattila/godbmigrator_cmd/cmd/migrator@latest
 go install github.com/olbrichattila/gocsvexporter/cmd/csvexporter@latest
 go install github.com/olbrichattila/gocsvimporter/cmd/csvimporter@latest
 ```
@@ -54,6 +56,46 @@ go install github.com/olbrichattila/gocsvimporter/cmd/csvimporter@latest
 Interactively generates .env file for your needs
 ```
 make appwizard
+```
+
+## Setup HTTPS:
+
+You need a signed certificate and a private key, add to .env
+```
+HTTPS_ENABLED=true
+HTTPS_LISTENING_PORT=8443
+HTTPS_CERT_FILE=ssh/certificate.pem
+HTTPS_PRIVATE_KEY_FILE=ssh/private_key.pem
+```
+
+Example generating test dummy key (.sh file) for testing:
+```
+#!/bin/bash
+
+# Output file names
+PRIVATE_KEY="private_key.pem"
+PUBLIC_KEY="public_key.pem"
+CERTIFICATE="certificate.pem"
+
+# Generate a 2048-bit RSA private key
+echo "Generating private key..."
+openssl genrsa -out $PRIVATE_KEY 2048
+
+# Generate public key from the private key
+echo "Generating public key..."
+openssl rsa -in $PRIVATE_KEY -pubout -out $PUBLIC_KEY
+
+echo "Generating self-signed certificate..."
+openssl req -new -x509 -key $PRIVATE_KEY -out $CERTIFICATE -days 365
+echo "Self-signed certificate generated: $CERTIFICATE"
+
+# Output result
+echo "Private key: $PRIVATE_KEY"
+echo "Public key: $PUBLIC_KEY"
+if [ "$generate_cert" == "y" ]; then
+    echo "Certificate: $CERTIFICATE"
+fi
+echo "Done!"
 ```
 
 ## Makefile targets:

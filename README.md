@@ -328,7 +328,6 @@ Add to: ```app/config/routes.go```
     RequestType: http.MethodGet,
     Fn:          controller.DisplayVehicles,
     Middlewares: AuthMiddleware,
-
 },
 ```
 

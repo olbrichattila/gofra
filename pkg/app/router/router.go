@@ -11,6 +11,7 @@ type ControllerAction struct {
 	RequestType     string
 	Fn              interface{}
 	Middlewares     []any
+	ViewAutoLoads   []string
 	ValidationRules string
 }
 

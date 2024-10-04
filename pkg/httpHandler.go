@@ -11,6 +11,7 @@ import (
 	"github.com/olbrichattila/gofra/pkg/app/router"
 	"github.com/olbrichattila/gofra/pkg/app/session"
 	"github.com/olbrichattila/gofra/pkg/app/validator"
+	"github.com/olbrichattila/gofra/pkg/app/view"
 	internalconfig "github.com/olbrichattila/gofra/pkg/internal-config"
 )
 
@@ -59,6 +60,8 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 				// redirected, stop execution
 				return true
 			}
+
+			h.loadRouteViewAutoLoads(action.ViewAutoLoads)
 
 			// This is the main controller call
 			result, err := h.app.di.Call(action.Fn)
@@ -249,6 +252,17 @@ func (h *hTTPHandler) getSessionerFromDi() session.Sessioner {
 	return nil
 }
 
+func (h *hTTPHandler) getViewFromDi() view.Viewer {
+	dep, err := h.app.di.GetDependency("olbrichattila.gofra.pkg.app.view.Viewer")
+	if err == nil {
+		if req, ok := dep.(view.Viewer); ok {
+			return req
+		}
+	}
+
+	return nil
+}
+
 func (h *hTTPHandler) mergeValidationErrors(errorSet1, errorSet2 validator.ValidationErrors) validator.ValidationErrors {
 	result := make(validator.ValidationErrors)
 	for key, value := range errorSet1 {
@@ -276,4 +290,9 @@ func (h *hTTPHandler) mergeValidationErrors(errorSet1, errorSet2 validator.Valid
 
 	}
 	return result
+}
+
+func (h *hTTPHandler) loadRouteViewAutoLoads(loads []string) {
+	view := h.getViewFromDi()
+	view.LoadTemplateParts(loads)
 }

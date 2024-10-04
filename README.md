@@ -328,8 +328,16 @@ Add to: ```app/config/routes.go```
     RequestType: http.MethodGet,
     Fn:          controller.DisplayVehicles,
     Middlewares: AuthMiddleware,
+
 },
 ```
+
+### Add autoload to routes, which will auto load view template(s) for that specific route only
+```
+Add to your route definition:
+	ViewAutoLoads: CorporateTemplateAutoLoads,
+```
+
 ### Generating middlewares
 
 it is exactly the same process as generating controllers, except the command called create:middleware. Please see the description above.
@@ -526,7 +534,7 @@ templateFiles := []string{
 		"templates/mypartial.html",
 	}
 
-v.LoadTemplateParts()
+v.LoadTemplateParts(templateFiles)
 ```
 
 The configuration for view partial auto-load:

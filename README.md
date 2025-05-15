@@ -766,6 +766,29 @@ func TestAction(r request.Requester) Request {
 }
 ```
 
+## Automatically marshal Body to json and also auto map route parameters to function
+> Mapped parameters always should be before injected interfaces
+```
+// test with body {"name":"Josh"}, http://localhost:8080/marshal POST
+type testRequest struct {
+	Name string `json:"name"`
+}
+
+// MarshalAction function can take any parameters defined in the Di config
+func MarshalAction(t testRequest, r request.Requester) {
+	fmt.Println("Marhalled", t, r.Get())
+	fmt.Println(r.JSONBody()) // THis should not work if I requested the marshal already, this is normal.
+}
+
+// For route: /marshal2/:id/:name/test
+// Note the parameters are defined by their order not by name
+func Marshal2Action(t testRequest, id int, name string, r request.Requester) {
+	fmt.Println("Marhalled", t, r.Get(), name, id)
+}
+
+```
+
+
 ## DB module
 Example:
 ```

@@ -63,8 +63,26 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 
 			h.loadRouteViewAutoLoads(action.ViewAutoLoads)
 
+			// If the first parameter is a struct or map, try to marshal body into it
+			fnType := reflect.TypeOf(action.Fn)
+			bodyAsStruct := []any{}
+			if fnType.NumIn() >= 1 {
+				paramType := fnType.In(0)
+				if paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Map {
+
+					paramPtr := reflect.New(paramType)
+					if err := json.NewDecoder(r.Body).Decode(paramPtr.Interface()); err != nil {
+						w.WriteHeader(http.StatusBadRequest)
+						w.Write([]byte(err.Error()))
+						return true
+					}
+
+					bodyAsStruct = append(bodyAsStruct, paramPtr.Elem().Interface())
+				}
+			}
+
 			// This is the main controller call
-			result, err := h.app.di.Call(action.Fn)
+			result, err := h.app.di.Call(action.Fn, bodyAsStruct...)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte(err.Error()))

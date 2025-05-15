@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 
 	"github.com/olbrichattila/gofra/pkg/app/request"
 	"github.com/olbrichattila/gofra/pkg/app/router"
@@ -63,22 +64,11 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 
 			h.loadRouteViewAutoLoads(action.ViewAutoLoads)
 
-			// If the first parameter is a struct or map, try to marshal body into it
-			fnType := reflect.TypeOf(action.Fn)
-			bodyAsStruct := []any{}
-			if fnType.NumIn() >= 1 {
-				paramType := fnType.In(0)
-				if paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Map {
-
-					paramPtr := reflect.New(paramType)
-					if err := json.NewDecoder(r.Body).Decode(paramPtr.Interface()); err != nil {
-						w.WriteHeader(http.StatusBadRequest)
-						w.Write([]byte(err.Error()))
-						return true
-					}
-
-					bodyAsStruct = append(bodyAsStruct, paramPtr.Elem().Interface())
-				}
+			bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, action.Fn, r)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return true
 			}
 
 			// This is the main controller call
@@ -94,6 +84,54 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 	}
 
 	return false
+}
+
+// this function tries to assign parameters to the controller from the route by name or render body to a struct
+// if the parameter type hint is struct. If int and the provided value is not int it returns false
+// Note these parameters must be at the beginning of the parameter list
+func (h *hTTPHandler) mapRouteParamsAndJsonBody(route string, fn any, r *http.Request) ([]any, error) {
+	bodyAsStruct := []any{}
+	fnType := reflect.TypeOf(fn)
+
+	parIndex := 0
+	for i := range fnType.NumIn() {
+		paramType := fnType.In(i)
+		paramValueAsString, err := h.requester.URLParByIndex(route, parIndex)
+		if err != nil {
+			return bodyAsStruct, err
+		}
+
+		if paramType.Kind() == reflect.String {
+			parIndex++
+			if h.requester != nil {
+				bodyAsStruct = append(bodyAsStruct, paramValueAsString)
+			} else {
+				return bodyAsStruct, fmt.Errorf("requested not set when trying to resolve string parameter")
+			}
+		} else if paramType.Kind() == reflect.Int {
+			parIndex++
+			if h.requester != nil {
+				if val, err := strconv.Atoi(paramValueAsString); err == nil {
+					bodyAsStruct = append(bodyAsStruct, val)
+				} else {
+					return bodyAsStruct, fmt.Errorf("expecting integer parameter, got string `%s`", paramValueAsString)
+				}
+			} else {
+				return bodyAsStruct, fmt.Errorf("requested not set when trying to resolve int parameter")
+			}
+		} else if paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Map {
+			paramPtr := reflect.New(paramType)
+			if err := json.NewDecoder(r.Body).Decode(paramPtr.Interface()); err != nil {
+				return bodyAsStruct, fmt.Errorf("cannot parse JSON body")
+			}
+
+			bodyAsStruct = append(bodyAsStruct, paramPtr.Elem().Interface())
+		} else {
+			return bodyAsStruct, nil
+		}
+	}
+
+	return bodyAsStruct, nil
 }
 
 func (h *hTTPHandler) initRoutes() {

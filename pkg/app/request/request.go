@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
+	"strings"
 )
 
 // TODO add JsonBody, passing a struct, and receiving back unmarshalled
@@ -23,6 +25,7 @@ type Requester interface {
 	JSONBody() map[string]interface{}
 	JSONToStruct(result interface{})
 	Headers() map[string][]string
+	URLParByIndex(string, int) (string, error)
 }
 
 func New() Requester {
@@ -32,6 +35,26 @@ func New() Requester {
 type Request struct {
 	r           *http.Request
 	routeParams map[string]string
+}
+
+// URLParByIndex implements Requester.
+func (r *Request) URLParByIndex(route string, index int) (string, error) {
+	x := 0
+	for i, val := range strings.Split(route, "/") {
+		if !strings.HasPrefix(val, ":") {
+			continue
+		}
+		if x == index {
+			segments := strings.Split(r.r.URL.Path, "/")
+			if len(segments) > i {
+				par, err := url.PathUnescape(segments[i])
+				return par, err
+			}
+		}
+		x++
+	}
+
+	return "", nil
 }
 
 func (r *Request) SetRequest(req *http.Request) {

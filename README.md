@@ -325,7 +325,7 @@ Add to: ```app/config/routes.go```
 ```
 {
     Path:        "/vehicles",
-    RequestType: http.MethodGet,
+    RequestType: []string{http.MethodGet},
     Fn:          controller.DisplayVehicles,
     Middlewares: AuthMiddleware,
 },
@@ -1023,7 +1023,7 @@ This is not mandatory to set on the route, if not set, no validation, but you ar
 // in your route configuration:
 	{
 		Path:            "/doregister",
-		RequestType:     http.MethodPost,
+		RequestType:     []string{http.MethodPost},
 		Fn:              controller.PostRegister,
 		ValidationRules: "register",
 	},

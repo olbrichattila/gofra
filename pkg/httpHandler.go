@@ -45,7 +45,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 		match, routePars := h.app.router.Match(action.Path, r.RequestURI)
 
 		if match {
-			if action.RequestType != r.Method {
+			if !h.isInRequestTypes(action.RequestType, r.Method) {
 				continue
 			}
 
@@ -92,6 +92,16 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 			}
 
 			return h.renderControllerResult(result, w)
+		}
+	}
+
+	return false
+}
+
+func (h *hTTPHandler) isInRequestTypes(requestTypes []string, requestType string) bool {
+	for _, rType := range requestTypes {
+		if rType == requestType {
+			return true
 		}
 	}
 

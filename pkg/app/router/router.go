@@ -8,7 +8,7 @@ import (
 
 type ControllerAction struct {
 	Path            string
-	RequestType     string
+	RequestType     []string
 	Fn              interface{}
 	Middlewares     []any
 	ViewAutoLoads   []string

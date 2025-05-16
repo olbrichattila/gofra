@@ -64,16 +64,9 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 
 			h.loadRouteViewAutoLoads(action.ViewAutoLoads)
 
-			bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, action.Fn, r)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				return true
-			}
-
 			// Crete controller from struct if provided
 			if action.Controller != nil {
-				result, err := h.resolveControllerActionFromStruct(action, bodyAsStruct)
+				result, err := h.resolveControllerActionFromStruct(action, r)
 				if err != nil {
 					w.WriteHeader(http.StatusInternalServerError)
 					w.Write([]byte(err.Error()))
@@ -81,6 +74,13 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 				}
 
 				return h.renderControllerResult(result, w)
+			}
+
+			bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, action.Fn, r)
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+				return true
 			}
 
 			// This is the main controller call
@@ -98,7 +98,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 	return false
 }
 
-func (h *hTTPHandler) resolveControllerActionFromStruct(action router.ControllerAction, bodyAsStruct []any) ([]reflect.Value, error) {
+func (h *hTTPHandler) resolveControllerActionFromStruct(action router.ControllerAction, r *http.Request) ([]reflect.Value, error) {
 	// Crete controller from struct if provided
 	controllerStruct := action.Controller()
 	if controllerStruct == nil {
@@ -115,10 +115,21 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 	// Call before action with DI
 	beforeMethod := val.MethodByName("Before")
 	if beforeMethod.IsValid() {
-		_, err := h.app.di.Call(beforeMethod.Interface(), bodyAsStruct...)
+
+		bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, beforeMethod.Interface(), r)
 		if err != nil {
 			return nil, err
 		}
+
+		_, err = h.app.di.Call(beforeMethod.Interface(), bodyAsStruct...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, method.Interface(), r)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := h.app.di.Call(method.Interface(), bodyAsStruct...)
@@ -129,7 +140,12 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 	// Call after method if exists
 	afterMethod := val.MethodByName("After")
 	if afterMethod.IsValid() {
-		_, err := h.app.di.Call(afterMethod.Interface(), bodyAsStruct...)
+		bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, afterMethod.Interface(), r)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = h.app.di.Call(afterMethod.Interface(), bodyAsStruct...)
 		if err != nil {
 			return nil, err
 		}

@@ -71,6 +71,18 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 				return true
 			}
 
+			// Crete controller from struct if provided
+			if action.Controller != nil {
+				result, err := h.resolveControllerActionFromStruct(action, bodyAsStruct)
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte(err.Error()))
+					return true
+				}
+
+				return h.renderControllerResult(result, w)
+			}
+
 			// This is the main controller call
 			result, err := h.app.di.Call(action.Fn, bodyAsStruct...)
 			if err != nil {
@@ -84,6 +96,46 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 	}
 
 	return false
+}
+
+func (h *hTTPHandler) resolveControllerActionFromStruct(action router.ControllerAction, bodyAsStruct []any) ([]reflect.Value, error) {
+	// Crete controller from struct if provided
+	controllerStruct := action.Controller()
+	if controllerStruct == nil {
+		return nil, fmt.Errorf("controller is nil")
+	}
+
+	// TODO check if it is a struct
+	val := reflect.ValueOf(controllerStruct)
+	method := val.MethodByName(action.ActionName)
+	if !method.IsValid() {
+		return nil, fmt.Errorf("action does not exists: %s", action.ActionName)
+	}
+
+	// Call before action with DI
+	beforeMethod := val.MethodByName("Before")
+	if beforeMethod.IsValid() {
+		_, err := h.app.di.Call(beforeMethod.Interface(), bodyAsStruct...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	result, err := h.app.di.Call(method.Interface(), bodyAsStruct...)
+	if err != nil {
+		return nil, err
+	}
+
+	// Call after method if exists
+	afterMethod := val.MethodByName("After")
+	if afterMethod.IsValid() {
+		_, err := h.app.di.Call(afterMethod.Interface(), bodyAsStruct...)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return result, nil
 }
 
 // this function tries to assign parameters to the controller from the route by name or render body to a struct

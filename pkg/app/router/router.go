@@ -13,6 +13,9 @@ type ControllerAction struct {
 	Middlewares     []any
 	ViewAutoLoads   []string
 	ValidationRules string
+	// Testing new way of controller creation
+	Controller func() any
+	ActionName string
 }
 
 type Router interface {

@@ -1,0 +1,6 @@
+1. middleware to pass down values to controller action.
+~~2. Controller, Job, Middleware and event should be a struct with Construct, and / or have a before and after function which would be called any time when a controller action is called (before) and after the action executed.~~
+3. Automatic file download management in controller
+4. Non mandatory route parameters like ?param
+~~5. Http OPTIONS should not be repeated, should be added to the same route definition~~
+~~6. Allow multiple HTTP methods for 1 route, make it a slice, like [GET, POST, OPTIONS]~~

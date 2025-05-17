@@ -8,6 +8,8 @@ import (
 	"reflect"
 	"strconv"
 
+	"slices"
+
 	"github.com/olbrichattila/gofra/pkg/app/gofraerror"
 	"github.com/olbrichattila/gofra/pkg/app/request"
 	"github.com/olbrichattila/gofra/pkg/app/router"
@@ -73,8 +75,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 			if action.Controller != nil {
 				result, err := h.resolveControllerActionFromStruct(action, r)
 				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte(err.Error()))
+					h.renderGofraError(w, err)
 					return true
 				}
 
@@ -104,13 +105,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 }
 
 func (h *hTTPHandler) isInRequestTypes(requestTypes []string, requestType string) bool {
-	for _, rType := range requestTypes {
-		if rType == requestType {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(requestTypes, requestType)
 }
 
 func (h *hTTPHandler) resolveControllerActionFromStruct(action router.ControllerAction, r *http.Request) ([]reflect.Value, error) {
@@ -136,10 +131,15 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 			return nil, err
 		}
 
-		_, err = h.app.di.Call(beforeMethod.Interface(), bodyAsStruct...)
+		beforeResult, err := h.app.di.Call(beforeMethod.Interface(), bodyAsStruct...)
 		if err != nil {
 			return nil, err
 		}
+
+		if len(beforeResult) == 1 && beforeResult[0].Interface() != nil && beforeResult[0].Interface().(error) != nil {
+			return nil, beforeResult[0].Interface().(error)
+		}
+
 	}
 
 	bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, method.Interface(), r)
@@ -160,9 +160,13 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 			return nil, err
 		}
 
-		_, err = h.app.di.Call(afterMethod.Interface(), bodyAsStruct...)
+		afterResult, err := h.app.di.Call(afterMethod.Interface(), bodyAsStruct...)
 		if err != nil {
 			return nil, err
+		}
+
+		if len(afterResult) == 1 && afterResult[0].Interface() != nil && afterResult[0].Interface().(error) != nil {
+			return nil, afterResult[0].Interface().(error)
 		}
 	}
 
@@ -319,21 +323,8 @@ func (h *hTTPHandler) renderControllerResult(result []reflect.Value, w http.Resp
 
 	// If second parameter is error, and not nill return error
 	if len(result) == 2 {
-		errorResult := result[1]
-		errorInterface := reflect.TypeOf((*error)(nil)).Elem()
-		if errorResult.Type().Implements(errorInterface) {
-			// Use type assertion to get the error
-			if err, ok := errorResult.Interface().(error); ok {
-				// Handle specific error type use case
-				if gofraError, ok := errorResult.Interface().(*gofraerror.Error); ok {
-					w.WriteHeader(gofraError.ResponseStatus)
-				} else {
-					w.WriteHeader(http.StatusInternalServerError)
-				}
-
-				w.Write([]byte(err.Error()))
-				return true
-			}
+		if h.renderErrorIfNecessary(w, result[1]) {
+			return true
 		}
 	}
 
@@ -440,4 +431,28 @@ func (h *hTTPHandler) mergeValidationErrors(errorSet1, errorSet2 validator.Valid
 func (h *hTTPHandler) loadRouteViewAutoLoads(loads []string) {
 	view := h.getViewFromDi()
 	view.LoadTemplateParts(loads)
+}
+
+func (h *hTTPHandler) renderErrorIfNecessary(w http.ResponseWriter, reflectMethod reflect.Value) bool {
+	errorInterface := reflect.TypeOf((*error)(nil)).Elem()
+	if reflectMethod.Type().Implements(errorInterface) {
+		// Use type assertion to get the errorf
+		if err, ok := reflectMethod.Interface().(error); ok {
+			h.renderGofraError(w, err)
+			return true
+		}
+	}
+
+	return false
+}
+
+func (h *hTTPHandler) renderGofraError(w http.ResponseWriter, err error) {
+	// Handle specific error type use case
+	if gofraError, ok := err.(*gofraerror.Error); ok {
+		w.WriteHeader(gofraError.ResponseStatus)
+	} else {
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	w.Write([]byte(err.Error()))
 }

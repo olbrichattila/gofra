@@ -26,8 +26,14 @@ func CreateMiddleware(a args.CommandArger, c commandcreator.CommandCreator, cc w
 	flags := a.GetAllFlags()
 	template := cc.GetTemplate(flags)
 
-	templateParams := cc.GetTemplateParams(flags)
-	err := c.Create(template, "./app/middlewares", templateParams)
+	commandName, err := a.Get(0)
+	if err != nil {
+		fmt.Printf("%s\nTry -help\n", err.Error())
+		return
+	}
+
+	templateParams := cc.GetTemplateParams(flags, commandName)
+	err = c.Create(template, "./app/middlewares", templateParams)
 	if err != nil {
 		fmt.Printf("%s\nTry -help\n", err.Error())
 		return

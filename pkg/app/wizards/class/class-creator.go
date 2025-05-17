@@ -2,8 +2,10 @@ package wizard
 
 import (
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
+	"unicode"
 )
 
 func NewClassCreator() ClassCreator {
@@ -14,7 +16,7 @@ type ClassCreator interface {
 	GetHelp() string
 	SetHelpHeader(string)
 	GetTemplate(map[string]string) string
-	GetTemplateParams(map[string]string) map[string]string
+	GetTemplateParams(map[string]string, string) map[string]string
 	SetParameterInfos(map[string]ParameterInfo)
 	SetOutParameterInfos(map[string]ParameterInfo)
 	SetTemplates(map[string]string)
@@ -62,13 +64,41 @@ func (c *ClassWizard) GetTemplate(flags map[string]string) string {
 	return ""
 }
 
-func (c *ClassWizard) GetTemplateParams(flags map[string]string) map[string]string {
+func (c *ClassWizard) GetTemplateParams(flags map[string]string, commandName string) map[string]string {
+	fmt.Println(flags)
 	return map[string]string{
-		"imports": c.getImportsAsString(flags),
-		"in":      c.getInputParamsAsString(flags),
-		"out":     c.getOutputParamsAsString(flags),
-		"return":  c.getReturnsAsString(flags),
+		"imports":   c.getImportsAsString(flags),
+		"in":        c.getInputParamsAsString(flags),
+		"out":       c.getOutputParamsAsString(flags),
+		"return":    c.getReturnsAsString(flags),
+		"structDef": c.getStructDefinitionIfNecessary(flags, commandName),
+		"receiver":  c.getReceiverFunctionIfNecessary(flags, commandName),
 	}
+}
+
+func (c *ClassWizard) getReceiverFunctionIfNecessary(flags map[string]string, commandName string) string {
+	if c.hasFlag(flags, "r") {
+		normalizedCommandName := c.normalizeFuncNameForStruct(commandName)
+		return "(c *" + normalizedCommandName + ") "
+	}
+
+	return ""
+}
+
+func (c *ClassWizard) getStructDefinitionIfNecessary(flags map[string]string, commandName string) string {
+	if c.hasFlag(flags, "r") {
+		normalizedCommandName := c.normalizeFuncNameForStruct(commandName)
+		return "\ntype " + normalizedCommandName + " struct {\n}\n"
+	}
+
+	return ""
+}
+
+func (c *ClassWizard) hasFlag(flags map[string]string, flagName string) bool {
+	if _, ok := flags[flagName]; ok {
+		return true
+	}
+	return false
 }
 
 func (c *ClassWizard) getInputParamsAsString(flags map[string]string) string {
@@ -269,6 +299,8 @@ func (c *ClassWizard) GetHelp() string {
 		}
 	}
 
+	c.strWriter(sb, "\nCreate receiver function controller:\n -r\n")
+
 	if len(ins) > 0 {
 		c.strWriter(sb, "\nOptional -in parameter values:\n")
 	}
@@ -314,4 +346,19 @@ func (c *ClassWizard) strWriter(sb *strings.Builder, pars ...string) {
 	for _, par := range pars {
 		sb.WriteString(par)
 	}
+}
+
+func (c *ClassWizard) normalizeFuncNameForStruct(s string) string {
+	re := regexp.MustCompile(`[^a-zA-Z0-9]+`)
+	s = re.ReplaceAllString(s, "")
+
+	if len(s) == 0 {
+		return ""
+	}
+
+	// Lowercase the first letter
+	runes := []rune(s)
+	runes[0] = unicode.ToUpper(runes[0])
+
+	return string(runes)
 }

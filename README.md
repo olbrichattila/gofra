@@ -195,6 +195,9 @@ Template variations if set, otherwise it will be the default:
 - api
 - crud
 
+Create receiver function controller:
+-r
+
 Optional -in parameter values:
 - cargs: a args.CommandArger
 - config: c config.Configer
@@ -319,6 +322,24 @@ func DestroyProductsCrudAction(c config.Configer, db db.DBer, l logger.Logger, m
      return "", nil
 }
 ```
+
+## How to return specific GOFRA error from controller
+The gofra error is designed to return a http status code, like 500 as well and can be formatted as plaintext or JSON to simplify returning error with error code and message
+Example:
+```
+func ErrorTestWithJsonAction() (string, error) {
+	return "test", gofraerror.NewJSON("This is the error", http.StatusBadRequest)
+}
+
+func ErrorTestWithPlaintextAction() (string, error) {
+	return "test", gofraerror.NewText("This is the error", http.StatusBadRequest)
+}
+
+func ErrorTestWithCustomTypeAction() (string, error) {
+		return "test", gofraerror.New("This is the error", gofraerror.ErrorTypeJSON, http.StatusBadRequest)
+}
+```
+
 ### Mapping controllers to routes
 Add to: ```app/config/routes.go```
 
@@ -330,6 +351,48 @@ Add to: ```app/config/routes.go```
     Middlewares: AuthMiddleware,
 },
 ```
+
+### Receiver controller types
+You can create receiver controller types (in artisan you can add -r flag)
+
+Example:
+```
+package controller
+
+import "fmt"
+
+type newTestResponse struct {
+	Message string `json:"message"`
+}
+
+type NewTestController struct{}
+
+func (*NewTestController) Before() {
+	fmt.Println("Before called")
+}
+
+func (*NewTestController) After() {
+	fmt.Println("After called")
+}
+
+func (*NewTestController) TestAction() newTestResponse {
+	fmt.Println("TestAction called")
+	return newTestResponse{Message: fmt.Sprintf("Hello, world!")}
+}
+```
+
+## Mapping receiver controller
+To map receiver controller you need to use a different mapping signature:
+Example:
+```
+{
+	Path:        "/mypath",
+	RequestType: []string{http.MethodGet},
+	Controller:  func() any { return &controller.NewTestController{} },
+	ActionName:  "TestAction",
+},
+```
+
 
 ### Add autoload to routes, which will auto load view template(s) for that specific route only
 ```

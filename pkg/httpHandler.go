@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/olbrichattila/gofra/pkg/app/gofraerror"
 	"github.com/olbrichattila/gofra/pkg/app/request"
 	"github.com/olbrichattila/gofra/pkg/app/router"
 	"github.com/olbrichattila/gofra/pkg/app/session"
@@ -237,7 +238,6 @@ func (h *hTTPHandler) initSession(w http.ResponseWriter, r *http.Request) {
 
 func (h *hTTPHandler) runMiddlewares(middlewares []interface{}) bool {
 	for _, middleware := range middlewares {
-
 		res, err := h.app.di.Call(middleware)
 		if err != nil {
 			fmt.Println(err.Error())
@@ -315,11 +315,18 @@ func (h *hTTPHandler) renderControllerResult(result []reflect.Value, w http.Resp
 
 	// If second parameter is error, and not nill return error
 	if len(result) == 2 {
+		errorResult := result[1]
 		errorInterface := reflect.TypeOf((*error)(nil)).Elem()
-		if result[1].Type().Implements(errorInterface) {
+		if errorResult.Type().Implements(errorInterface) {
 			// Use type assertion to get the error
-			if err, ok := result[1].Interface().(error); ok {
-				w.WriteHeader(http.StatusInternalServerError)
+			if err, ok := errorResult.Interface().(error); ok {
+				// Handle specific error type use case
+				if gofraError, ok := errorResult.Interface().(*gofraerror.Error); ok {
+					w.WriteHeader(gofraError.ResponseStatus)
+				} else {
+					w.WriteHeader(http.StatusInternalServerError)
+				}
+
 				w.Write([]byte(err.Error()))
 				return true
 			}

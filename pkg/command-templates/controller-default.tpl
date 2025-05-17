@@ -1,5 +1,5 @@
 package controller
-{{.imports}}
+{{.imports}}{{.structDef}}
 // {{.name}}Action function can take any parameters defined in the Di config
-func {{.name}}Action({{.in}}){{.out}} {
+func {{.receiver}}{{.name}}Action({{.in}}){{.out}} {
 {{.return}}}

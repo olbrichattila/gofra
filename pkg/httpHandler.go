@@ -34,7 +34,10 @@ func (h *hTTPHandler) ServeHTTP(
 	h.initSession(w, r)
 
 	h.app.di.Set("http.ResponseWriter", w)
-	h.runMiddlewares(h.app.conf.Middlewares())
+	if h.runMiddlewares(h.app.conf.Middlewares()) {
+		// If middleware want to terminate process
+		return
+	}
 
 	if !h.renderActionIfRouteFind(w, r) {
 		http.NotFound(w, r)
@@ -55,6 +58,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 			}
 
 			if h.runMiddlewares(action.Middlewares) {
+				// If middleware want to terminate process
 				return true
 			}
 

@@ -54,16 +54,18 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 		if match {
 			if action.IsStatic {
 				// Serve static file
+				baseStaticPath := action.StaticPath
+				if !strings.HasPrefix(baseStaticPath, "/") {
+					baseStaticPath = "/" + baseStaticPath
+				}
+
 				if fileToServe, ok := routePars["*"]; ok {
-					baseStaticPath := action.StaticPath
-					if !strings.HasPrefix(baseStaticPath, "/") {
-						baseStaticPath = "/" + baseStaticPath
-					}
 					http.ServeFile(w, r, string(http.Dir("."+baseStaticPath+fileToServe)))
 					return true
 				}
 
-				return false
+				http.ServeFile(w, r, string(http.Dir("."+baseStaticPath)))
+				return true
 			}
 
 			if !h.isInRequestTypes(action.RequestType, r.Method) {

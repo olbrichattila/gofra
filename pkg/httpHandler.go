@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 
 	"slices"
 
@@ -51,6 +52,20 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 		match, routePars := h.app.router.Match(action.Path, r.RequestURI)
 
 		if match {
+			if action.IsStatic {
+				// Serve static file
+				if fileToServe, ok := routePars["*"]; ok {
+					baseStaticPath := action.StaticPath
+					if !strings.HasPrefix(baseStaticPath, "/") {
+						baseStaticPath = "/" + baseStaticPath
+					}
+					http.ServeFile(w, r, string(http.Dir("."+baseStaticPath+fileToServe)))
+					return true
+				}
+
+				return false
+			}
+
 			if !h.isInRequestTypes(action.RequestType, r.Method) {
 				continue
 			}

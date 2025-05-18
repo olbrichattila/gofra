@@ -352,6 +352,25 @@ Add to: ```app/config/routes.go```
 },
 ```
 
+### Mapping to static file server
+You can create a static file server pointing to any directory in your local system: Examples
+```
+// This points to any file in the root only
+{
+	Path:        "/*",
+	RequestType: []string{http.MethodGet},
+	IsStatic:    true,
+},
+
+// This point to any file in static folder which is located locally in static directory and sub folders are all mapped like `/static/css/main.css` will work.
+{
+	Path:        "/static/**",
+	StaticPath:  "/frontend/",
+	RequestType: []string{http.MethodGet},
+	IsStatic:    true,
+},
+```
+
 ### Receiver controller types
 You can create receiver controller types (in artisan you can add -r flag)
 

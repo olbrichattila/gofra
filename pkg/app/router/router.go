@@ -13,9 +13,10 @@ type ControllerAction struct {
 	Middlewares     []any
 	ViewAutoLoads   []string
 	ValidationRules string
-	// Testing new way of controller creation
-	Controller func() any
-	ActionName string
+	Controller      func() any
+	ActionName      string
+	IsStatic        bool
+	StaticPath      string
 }
 
 type Router interface {
@@ -30,16 +31,17 @@ func NewRouter() Router {
 	return &Route{}
 }
 
-func (*Route) Match(route, requestUrl string) (bool, map[string]string) {
+func (r *Route) Match(route, requestUrl string) (bool, map[string]string) {
 	params := make(map[string]string)
 	routePars := strings.Split(route, "/")
 	baseUrl := strings.Split(requestUrl, "?")[0]
 	urlPars := strings.Split(baseUrl, "/")
-	if len(routePars) != len(urlPars) {
+	if len(routePars) != len(urlPars) && routePars[len(routePars)-1] != "**" {
 		return false, nil
 	}
 
 	for i, part := range routePars {
+		// Bind parameters
 		if len(part) > 0 && part[0] == ':' {
 			par, err := url.QueryUnescape(urlPars[i])
 			if err != nil {
@@ -47,6 +49,22 @@ func (*Route) Match(route, requestUrl string) (bool, map[string]string) {
 			}
 			params[part[1:]] = par
 			continue
+		}
+
+		// Bind single star, one route par, use only once in the route
+		if part == "*" {
+			par, err := url.QueryUnescape(urlPars[i])
+			if err != nil {
+				par = urlPars[i]
+			}
+			params["*"] = par
+			continue
+		}
+
+		// Bind double star, resolves all other part of the route
+		if part == "**" {
+			params["*"] = r.getRestOfUrl(urlPars, i)
+			return true, params
 		}
 
 		if urlPars[i] != part {
@@ -75,8 +93,23 @@ func (*Route) Build(route string, pars map[string]string) (string, error) {
 		}
 
 		sb.WriteString(part)
-
 	}
 
 	return sb.String(), nil
+}
+
+func (*Route) getRestOfUrl(urlPars []string, index int) string {
+	sb := &strings.Builder{}
+	for i := index; i < len(urlPars); i++ {
+		if i > index {
+			sb.WriteRune('/')
+		}
+		unescaped, err := url.QueryUnescape(urlPars[i])
+		if err != nil {
+			unescaped = urlPars[i]
+		}
+		sb.WriteString(unescaped)
+	}
+
+	return sb.String()
 }

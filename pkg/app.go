@@ -95,8 +95,6 @@ func (a *App) Serve() {
 	}
 
 	hTTPHandler := &hTTPHandler{app: a}
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
 	http.Handle("/", hTTPHandler)
 
 	err = a.listenHttps()

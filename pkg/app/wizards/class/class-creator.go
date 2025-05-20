@@ -65,7 +65,6 @@ func (c *ClassWizard) GetTemplate(flags map[string]string) string {
 }
 
 func (c *ClassWizard) GetTemplateParams(flags map[string]string, commandName string) map[string]string {
-	fmt.Println(flags)
 	return map[string]string{
 		"imports":   c.getImportsAsString(flags),
 		"in":        c.getInputParamsAsString(flags),

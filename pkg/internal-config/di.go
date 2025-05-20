@@ -27,10 +27,6 @@ import (
 	pkg "github.com/olbrichattila/gosqlbuilder/pkg"
 )
 
-func getOpenedDb() interface{} {
-	return db.New()
-}
-
 func getSqlBuilder() interface{} {
 	dbConnection := os.Getenv(db.EnvdbConnection)
 	builder := gosqlbuilder.New()
@@ -49,6 +45,7 @@ func getSqlBuilder() interface{} {
 	return builder
 }
 
+// TODO review which dependency shell we resolve with closure so it is non singleton therefore we can avoid go routine race conditions deadlocks
 var DiBindings = []config.DiCallback{
 	func(di godi.Container) (string, interface{}, error) {
 		env, err := di.Get(env.New())
@@ -67,13 +64,13 @@ var DiBindings = []config.DiCallback{
 		return "olbrichattila.gofra.pkg.app.request.Requester", request.New(), nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
-		return "olbrichattila.gofra.pkg.app.validator.Validator", validator.New(), nil
+		return "olbrichattila.gofra.pkg.app.validator.Validator", func() any { return validator.New() }, nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
 		return "olbrichattila.gofra.pkg.app.db.DBFactoryer", db.NewDBFactory(), nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
-		return "olbrichattila.gofra.pkg.app.db.DBer", getOpenedDb, nil
+		return "olbrichattila.gofra.pkg.app.db.DBer", func() any { return db.New() }, nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
 		return "olbrichattila.gosqlbuilder.pkg.Builder", getSqlBuilder, nil

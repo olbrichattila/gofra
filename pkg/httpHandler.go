@@ -413,6 +413,13 @@ func (h *hTTPHandler) getViewFromDi() view.Viewer {
 		}
 	}
 
+	if dep, ok := dep.(func() any); ok {
+		resolvedDep := dep()
+		if req, ok := resolvedDep.(view.Viewer); ok {
+			return req
+		}
+	}
+
 	return nil
 }
 

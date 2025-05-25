@@ -5,3 +5,4 @@
 ~~5. Http OPTIONS should not be repeated, should be added to the same route definition~~
 ~~6. Allow multiple HTTP methods for 1 route, make it a slice, like [GET, POST, OPTIONS]~~
 ~~7. Before after should be able to return error~~
+8. The RequestType changed to []string{} wizard generates incorrect route if I request login 

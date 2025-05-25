@@ -58,9 +58,6 @@ var DiBindings = []config.DiCallback{
 		return "olbrichattila.gofra.pkg.app.router.Router", router.NewRouter(), nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
-		return "olbrichattila.gofra.pkg.app.view.Viewer", view.New(), nil
-	},
-	func(di godi.Container) (string, interface{}, error) {
 		return "olbrichattila.gofra.pkg.app.request.Requester", request.New(), nil
 	},
 	func(di godi.Container) (string, interface{}, error) {
@@ -119,5 +116,12 @@ var DiBindings = []config.DiCallback{
 	},
 	func(di godi.Container) (string, interface{}, error) {
 		return "olbrichattila.gofra.pkg.app.event.Eventer", event.NewLocalEvent(), nil
+	},
+	func(di godi.Container) (string, interface{}, error) {
+		return "olbrichattila.gofra.pkg.app.view.Viewer",
+			func() any {
+				return view.New()
+			},
+			nil
 	},
 }

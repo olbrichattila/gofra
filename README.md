@@ -956,6 +956,26 @@ type Page struct {
 }
 ```
 
+***With JSON***  it also works
+```go
+type Page struct {
+	TableName       bool      `tableName:"pages"`
+	Id              int64     `json:"id"`
+	Slug            string    `json:"slug" fieldName:"page_slug"` // Here the database will use page_slug, marshal slug
+	Title           string    `json:"title"`
+}
+```
+
+***Using the struct*** as JSON Marshal/Unmarshal and as a data entity at the same time
+```go
+type Page struct {
+	TableName       bool      `tableName:"pages"`
+	Id              int64     `json:"id"`
+	Slug            string    `json:"slug"`
+	Title           string    `json:"title"`
+}
+```
+
 ### Available functions:
 - ById
 - All

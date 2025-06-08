@@ -931,6 +931,66 @@ if err != nil {
 
 To see all features look at the package documentation at: https://github.com/olbrichattila/gosqlbuilder
 
+## Entities
+There is a lightweight entity manager, create structs, save, load update them.
+Example struct:
+
+```go
+package entities
+
+import "time"
+
+type Page struct {
+	TableName       bool      `tableName:"pages"`
+	Id              int64     `fieldName:"id"`
+	Slug            string    `fieldName:"slug"`
+	Title           string    `fieldName:"title"`
+	IsActive        bool      `fieldName:"is_active"`
+	Content         *string   `fieldName:"content"`
+	MetaTitle       string    `fieldName:"meta_title"`
+	MetaDescription string    `fieldName:"meta_description"`
+	MetaKeywords    string    `fieldName:"meta_keywords"`
+	CreatedAt       time.Time `fieldName:"created_at"`
+	UpdatedAt       time.Time `fieldName:"updated_at"`
+}
+```
+
+### Available functions:
+- ById
+- All
+- ByWhere
+- Delete
+- Save
+
+### Nulllable fields
+If you use nullable field you should define it as a pointer like *string.
+
+Note: There is a helper to make it simplet to assign a nullable value: ```entityAdapter.Nullable("Hello")``` Alternatively with strict type ```entityAdapter.Nullable[string]("Hello"),```
+For NULL (nil), just omit the assignment or explicitly assign ```nil``` if you like.
+
+### Usage:
+You can use tags for fieldName or tableName in your struct.
+If the tableName not used, the system will use your struct name in lowercase format as table name.
+If you don'w use fieldName, the field names will be defaulted to the name in your struc.
+
+Examples:
+```go
+
+	entities.Save(db,
+		entities.Page{
+			Id:      0,
+			Slug:    "test slug",
+			Title:   "titleXXX",
+			Content: entityAdapter.Nullable("Hello"),
+		})
+
+	e, err := entities.ById[entities.Page](db, 1)
+	fmt.Println(e, err)
+
+	all, err := entities.ByWhere[entities.Page](db, "")
+	fmt.Println(all, err)
+```
+
 ## Logger:
 Example:
 ```

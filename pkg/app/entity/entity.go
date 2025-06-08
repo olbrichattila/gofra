@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	tagFieldName = "fieldName"
-	tagTableName = "tableName"
+	tagJSONFieldName = "json"
+	tagFieldName     = "fieldName"
+	tagTableName     = "tableName"
 )
 
 type fieldDef struct {
@@ -130,9 +131,15 @@ func parseEntity(entity any) ([]fieldDef, string, int64, error) {
 			continue
 		}
 
-		name := field.Tag.Get(tagFieldName)
-		if name == "" {
-			name = field.Name
+		name := field.Name
+		tagName := field.Tag.Get(tagJSONFieldName)
+		if tagName != "" {
+			name = tagName
+		}
+
+		tagName = field.Tag.Get(tagFieldName)
+		if tagName != "" {
+			name = tagName
 		}
 
 		val := v.Field(i)
@@ -204,9 +211,15 @@ func mapToStruct(data map[string]any, dest any) error {
 			continue
 		}
 
-		key := field.Tag.Get(tagFieldName)
-		if key == "" {
-			key = field.Name
+		key := field.Name
+		tagName := field.Tag.Get(tagJSONFieldName)
+		if tagName != "" {
+			key = tagName
+		}
+
+		tagName = field.Tag.Get(tagFieldName)
+		if tagName != "" {
+			key = tagName
 		}
 
 		mapVal, ok := data[key]

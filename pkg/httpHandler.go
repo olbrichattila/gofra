@@ -301,7 +301,6 @@ func (h *hTTPHandler) runValidator(w http.ResponseWriter, r *http.Request, valid
 		isValid := true
 
 		if rule, ok := h.app.validationRules[validationRules]; ok {
-
 			if h.customValidator != nil {
 				allRequests := h.requester.AllFlat()
 				if rule.Rules != nil {
@@ -386,11 +385,19 @@ func (h *hTTPHandler) renderJson(jsonData interface{}, w http.ResponseWriter) {
 	w.Write(jsonRes)
 }
 
+// TODO core repetition here, fix it
 func (h *hTTPHandler) getRequestFromDi() request.Requester {
 	dep, err := h.app.di.GetDependency("olbrichattila.gofra.pkg.app.request.Requester")
 	if err == nil {
 		if req, ok := dep.(request.Requester); ok {
 			return req
+		}
+
+		if dep, ok := dep.(func() any); ok {
+			resolvedDep := dep()
+			if req, ok := resolvedDep.(request.Requester); ok {
+				return req
+			}
 		}
 	}
 
@@ -403,6 +410,13 @@ func (h *hTTPHandler) getValidatorFromDi() validator.Validator {
 		if req, ok := dep.(validator.Validator); ok {
 			return req
 		}
+
+		if dep, ok := dep.(func() any); ok {
+			resolvedDep := dep()
+			if req, ok := resolvedDep.(validator.Validator); ok {
+				return req
+			}
+		}
 	}
 
 	return nil
@@ -413,6 +427,13 @@ func (h *hTTPHandler) getSessionerFromDi() session.Sessioner {
 	if err == nil {
 		if req, ok := dep.(session.Sessioner); ok {
 			return req
+		}
+
+		if dep, ok := dep.(func() any); ok {
+			resolvedDep := dep()
+			if req, ok := resolvedDep.(session.Sessioner); ok {
+				return req
+			}
 		}
 	}
 
@@ -425,12 +446,12 @@ func (h *hTTPHandler) getViewFromDi() view.Viewer {
 		if req, ok := dep.(view.Viewer); ok {
 			return req
 		}
-	}
 
-	if dep, ok := dep.(func() any); ok {
-		resolvedDep := dep()
-		if req, ok := resolvedDep.(view.Viewer); ok {
-			return req
+		if dep, ok := dep.(func() any); ok {
+			resolvedDep := dep()
+			if req, ok := resolvedDep.(view.Viewer); ok {
+				return req
+			}
 		}
 	}
 

@@ -965,7 +965,7 @@ type Page struct {
 ### Nulllable fields
 If you use nullable field you should define it as a pointer like *string.
 
-Note: There is a helper to make it simplet to assign a nullable value: ```entityAdapter.Nullable("Hello")``` Alternatively with strict type ```entityAdapter.Nullable[string]("Hello"),```
+Note: There is a helper to make it simplet to assign a nullable value: ```entiy.Nullable("Hello")``` Alternatively with strict type ```entiy.Nullable[string]("Hello"),```
 For NULL (nil), just omit the assignment or explicitly assign ```nil``` if you like.
 
 ### Usage:
@@ -976,18 +976,18 @@ If you don'w use fieldName, the field names will be defaulted to the name in you
 Examples:
 ```go
 
-	entities.Save(db,
+	entiy.Save(db,
 		entities.Page{
 			Id:      0,
 			Slug:    "test slug",
 			Title:   "titleXXX",
-			Content: entityAdapter.Nullable("Hello"),
+			Content: entiy.Nullable("Hello"),
 		})
 
-	e, err := entities.ById[entities.Page](db, 1)
+	e, err := entiy.ById[entities.Page](db, 1)
 	fmt.Println(e, err)
 
-	all, err := entities.ByWhere[entities.Page](db, "")
+	all, err := entiy.ByWhere[entities.Page](db, "")
 	fmt.Println(all, err)
 ```
 

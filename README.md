@@ -848,7 +848,7 @@ func TestAction(r request.Requester) Request {
 }
 ```
 
-## Automatically marshal Body to json and also auto map route parameters to function
+## Automatically marshal or Form Requests to JSON and also auto map route parameters to function
 > Mapped parameters always should be before injected interfaces
 ```
 // test with body {"name":"Josh"}, http://localhost:8080/marshal POST
@@ -870,6 +870,7 @@ func Marshal2Action(t testRequest, id int, name string, r request.Requester) {
 
 ```
 
+---
 
 ## DB module
 Example:

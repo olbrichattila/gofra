@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"reflect"
@@ -99,7 +100,7 @@ func (h *hTTPHandler) renderActionIfRouteFind(w http.ResponseWriter, r *http.Req
 				return h.renderControllerResult(result, w)
 			}
 
-			bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, action.Fn, r)
+			bodyAsStruct, err := h.mapRouteParamsIfResolvable(action.Path, action.Fn, r)
 			if err != nil {
 				w.WriteHeader(http.StatusBadRequest)
 				w.Write([]byte(err.Error()))
@@ -143,7 +144,7 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 	beforeMethod := val.MethodByName("Before")
 	if beforeMethod.IsValid() {
 
-		bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, beforeMethod.Interface(), r)
+		bodyAsStruct, err := h.mapRouteParamsIfResolvable(action.Path, beforeMethod.Interface(), r)
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +160,7 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 
 	}
 
-	bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, method.Interface(), r)
+	bodyAsStruct, err := h.mapRouteParamsIfResolvable(action.Path, method.Interface(), r)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +173,7 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 	// Call after method if exists
 	afterMethod := val.MethodByName("After")
 	if afterMethod.IsValid() {
-		bodyAsStruct, err := h.mapRouteParamsAndJsonBody(action.Path, afterMethod.Interface(), r)
+		bodyAsStruct, err := h.mapRouteParamsIfResolvable(action.Path, afterMethod.Interface(), r)
 		if err != nil {
 			return nil, err
 		}
@@ -190,11 +191,12 @@ func (h *hTTPHandler) resolveControllerActionFromStruct(action router.Controller
 	return result, nil
 }
 
-// this function tries to assign parameters to the controller from the route by name or render body to a struct
+// this function tries to assign parameters to the controller from the route by name or render body to a struct, or form to struct ot map[string]any
 // if the parameter type hint is struct. If int and the provided value is not int it returns false
 // Note these parameters must be at the beginning of the parameter list
-func (h *hTTPHandler) mapRouteParamsAndJsonBody(route string, fn any, r *http.Request) ([]any, error) {
+func (h *hTTPHandler) mapRouteParamsIfResolvable(route string, fn any, r *http.Request) ([]any, error) {
 	bodyAsStruct := []any{}
+	var bodyBytes []byte
 	fnType := reflect.TypeOf(fn)
 
 	parIndex := 0
@@ -224,12 +226,24 @@ func (h *hTTPHandler) mapRouteParamsAndJsonBody(route string, fn any, r *http.Re
 				return bodyAsStruct, fmt.Errorf("requested not set when trying to resolve int parameter")
 			}
 		} else if paramType.Kind() == reflect.Struct || paramType.Kind() == reflect.Map {
-			paramPtr := reflect.New(paramType)
-			if err := json.NewDecoder(r.Body).Decode(paramPtr.Interface()); err != nil {
-				return bodyAsStruct, fmt.Errorf("cannot parse JSON body")
+			if h.isFormRequest(r) {
+				if paramType.Kind() == reflect.Struct {
+					err = h.marshalFormDataToBodyAsStruct(paramType, r, &bodyAsStruct)
+				} else {
+					err = h.marshalFormDataToBodyAsMap(paramType, r, &bodyAsStruct)
+				}
+			} else {
+				if bodyBytes == nil {
+					bodyBytes, err = io.ReadAll(r.Body)
+					if err != nil {
+						return bodyAsStruct, fmt.Errorf("failed to read body: %w", err)
+					}
+				}
+				err = h.marshalToBodyAsStruct(bodyBytes, paramType, r, &bodyAsStruct)
 			}
-
-			bodyAsStruct = append(bodyAsStruct, paramPtr.Elem().Interface())
+			if err != nil {
+				return bodyAsStruct, fmt.Errorf("cannot parse request body %w", err)
+			}
 		} else {
 			return bodyAsStruct, nil
 		}
@@ -479,4 +493,112 @@ func (h *hTTPHandler) renderGofraError(w http.ResponseWriter, err error) {
 	}
 
 	w.Write([]byte(err.Error()))
+}
+
+func (h *hTTPHandler) isFormRequest(r *http.Request) bool {
+	contentType := r.Header.Get("Content-Type")
+	return strings.HasPrefix(contentType, "application/x-www-form-urlencoded")
+}
+
+func (h *hTTPHandler) marshalToBodyAsStruct(bodyBytes []byte, paramType reflect.Type, r *http.Request, bodyAsStruct *[]any) error {
+	paramPtr := reflect.New(paramType)
+
+	if err := json.Unmarshal(bodyBytes, paramPtr.Interface()); err != nil {
+		return fmt.Errorf("decode into first struct failed: %w", err)
+	}
+
+	*bodyAsStruct = append(*bodyAsStruct, paramPtr.Elem().Interface())
+
+	return nil
+}
+
+func (h *hTTPHandler) marshalFormDataToBodyAsStruct(paramType reflect.Type, r *http.Request, bodyAsStruct *[]any) error {
+	paramPtr := reflect.New(paramType)
+	if err := r.ParseForm(); err != nil {
+		return fmt.Errorf("cannot parse Form")
+	}
+
+	typ := paramPtr.Elem().Type()
+	val := paramPtr.Elem()
+	for i := 0; i < typ.NumField(); i++ {
+		fieldName := typ.Field(i)
+		field := val.Field(i)
+		if fieldName.PkgPath != "" {
+			continue
+		}
+
+		key := fieldName.Tag.Get("json")
+		if key == "" {
+			key = fieldName.Name
+		}
+
+		formVal, ok := r.PostForm[key]
+		if !ok || len(formVal) == 0 {
+			continue
+		}
+
+		raw := strings.TrimSpace(formVal[0])
+
+		// Resolve pointers
+		fieldType := field.Type()
+		isPtr := fieldType.Kind() == reflect.Ptr
+		if isPtr {
+			fieldType = fieldType.Elem()
+		}
+
+		var parsed reflect.Value
+		switch fieldType.Kind() {
+		case reflect.String:
+			parsed = reflect.ValueOf(raw)
+		case reflect.Int:
+			if i, err := strconv.Atoi(raw); err == nil {
+				parsed = reflect.ValueOf(i)
+			} else {
+				continue
+			}
+		case reflect.Int64:
+			if i64, err := strconv.ParseInt(raw, 10, 64); err == nil {
+				parsed = reflect.ValueOf(i64)
+			} else {
+				continue
+			}
+		case reflect.Bool:
+			if b, err := strconv.ParseBool(raw); err == nil {
+				parsed = reflect.ValueOf(b)
+			} else {
+				continue
+			}
+		default:
+			continue // unsupported type
+		}
+
+		if isPtr {
+			field.Set(reflect.New(fieldType))
+			field.Elem().Set(parsed.Convert(fieldType))
+		} else {
+			field.Set(parsed.Convert(fieldType))
+		}
+	}
+
+	*bodyAsStruct = append(*bodyAsStruct, paramPtr.Elem().Interface())
+
+	return nil
+}
+
+func (h *hTTPHandler) marshalFormDataToBodyAsMap(paramType reflect.Type, r *http.Request, bodyAsStruct *[]any) error {
+	err := r.ParseForm()
+	if err != nil {
+		return err
+	}
+
+	result := make(map[string]any)
+	for key, values := range r.PostForm {
+		if len(values) > 0 {
+			result[key] = values[0] // only the first value
+		}
+	}
+
+	*bodyAsStruct = append(*bodyAsStruct, result)
+
+	return nil
 }

@@ -1,5 +1,10 @@
 package entity
 
+// TODO add Count and Exist (width where)
+// Auto detect SQL DB flavour and decide to use ? or $1 for binding
+// Return or Alter entity to save the ID after Save (Last Insert ID)
+// Can I combine with SQL builder as well?
+
 import (
 	"errors"
 	"reflect"
@@ -66,6 +71,42 @@ func ByWhere[T any](db db.DBer, where string, params ...any) ([]T, error) {
 		if err := mapToStruct(row, &item); err == nil {
 			result = append(result, item)
 		}
+	}
+	return result, nil
+}
+
+func Count[T any](db db.DBer, where string, params ...any) (int64, error) {
+	var entity T
+	_, tableName, _, err := parseEntity(entity)
+	if err != nil {
+		return 0, err
+	}
+
+	sql := "SELECT count(*) as cnt FROM `" + tableName + "` " + where
+	row, err := db.QueryOne(sql, params...)
+	if err != nil {
+		return 0, err
+	}
+
+	return row["cnt"].(int64), nil
+}
+
+func Exists[T any](db db.DBer, where string, params ...any) (bool, error) {
+	var entity T
+	_, tableName, _, err := parseEntity(entity)
+	if err != nil {
+		return false, err
+	}
+
+	sql := "SELECT * FROM `" + tableName + "` " + where + " LIMIT 1"
+	rows := db.QueryAll(sql, params...)
+	if err := db.GetLastError(); err != nil {
+		return false, err
+	}
+
+	result := false
+	for range rows {
+		result = true
 	}
 	return result, nil
 }

@@ -141,7 +141,11 @@ func Save(db db.DBer, entity any) error {
 		return err
 	}
 
-	_, err = db.Execute(sql, args...)
+	insertId, err := db.Execute(sql, args...)
+	if id == 0 && err == nil {
+		return updateIdIfPossible(insertId, entity)
+	}
+
 	return err
 }
 
@@ -199,7 +203,46 @@ func parseEntity(entity any) ([]fieldDef, string, int64, error) {
 
 		fields = append(fields, fieldDef{name: name, value: val.Interface()})
 	}
+
 	return fields, tableName, id, nil
+}
+
+func updateIdIfPossible(newId int64, entity any) error {
+	t := reflect.TypeOf(entity)
+	v := reflect.ValueOf(entity)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+		v = v.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return errors.New("parseEntity: not a struct or pointer to struct")
+	}
+
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" {
+			continue // skip unexported
+		}
+
+		name := field.Name
+		tagName := field.Tag.Get(tagJSONFieldName)
+		if tagName != "" {
+			name = tagName
+		}
+
+		tagName = field.Tag.Get(tagFieldName)
+		if tagName != "" {
+			name = tagName
+		}
+
+		val := v.Field(i)
+		if name == "id" && val.Kind() == reflect.Int64 {
+			val.SetInt(newId)
+		}
+	}
+
+	return nil
 }
 
 func toInsertSQL(fields []fieldDef, table string) (string, []any, error) {

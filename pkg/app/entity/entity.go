@@ -121,13 +121,24 @@ func Delete(db db.DBer, entity any) error {
 	return err
 }
 
+func DeleteById[T any](db db.DBer, id int64) error {
+	var entity T
+	_, tableName, _, err := parseEntity(entity)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Execute("DELETE FROM `"+tableName+"` WHERE `id` = ?", id)
+	return err
+}
+
 func DeleteWhere(db db.DBer, entity any, where string, pars ...any) error {
 	_, tableName, _, err := parseEntity(entity)
 	if err != nil {
 		return err
 	}
 
-	_, err = db.Execute("DELETE FROM `"+tableName+"` "+where, pars)
+	_, err = db.Execute("DELETE FROM `"+tableName+"` "+where, pars...)
 	return err
 }
 

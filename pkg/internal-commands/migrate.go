@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/olbrichattila/godbmigrator/config"
 	"github.com/olbrichattila/gofra/pkg/app/args"
 	"github.com/olbrichattila/gofra/pkg/app/db"
 
@@ -15,56 +16,56 @@ import (
 const defaultMigrationFilePath = "./migrations"
 
 func Migrate(a args.CommandArger, dbConfig db.DBFactoryer) {
-	dbConn, MigrationProvider, migrationFilePath, step, err := constructMigratorOptions(a, dbConfig)
+	dbConn, m, step, err := constructMigratorOptions(a, dbConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer dbConn.Close()
 
-	err = migrator.Migrate(dbConn, MigrationProvider, migrationFilePath, step)
+	err = m.Migrate(step)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 }
 
 func Rollback(a args.CommandArger, dbConfig db.DBFactoryer) {
-	dbConn, MigrationProvider, migrationFilePath, step, err := constructMigratorOptions(a, dbConfig)
+	dbConn, m, step, err := constructMigratorOptions(a, dbConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer dbConn.Close()
 
-	err = migrator.Rollback(dbConn, MigrationProvider, migrationFilePath, step)
+	err = m.Rollback(step)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 }
 
 func Refresh(a args.CommandArger, dbConfig db.DBFactoryer) {
-	dbConn, MigrationProvider, migrationFilePath, _, err := constructMigratorOptions(a, dbConfig)
+	dbConn, m, _, err := constructMigratorOptions(a, dbConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer dbConn.Close()
 
-	err = migrator.Refresh(dbConn, MigrationProvider, migrationFilePath)
+	err = m.Refresh()
 	if err != nil {
 		fmt.Println(err.Error())
 	}
 }
 
 func Report(a args.CommandArger, dbConfig db.DBFactoryer) {
-	dbConn, MigrationProvider, migrationFilePath, _, err := constructMigratorOptions(a, dbConfig)
+	dbConn, m, _, err := constructMigratorOptions(a, dbConfig)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 	defer dbConn.Close()
 
-	report, err := migrator.Report(dbConn, MigrationProvider, migrationFilePath)
+	report, err := m.Report()
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -74,40 +75,46 @@ func Report(a args.CommandArger, dbConfig db.DBFactoryer) {
 }
 
 func Add(a args.CommandArger, dbConfig db.DBFactoryer) {
-	migrationFilePath := getMigrationFilePath()
+	dbConn, m, _, err := constructMigratorOptions(a, dbConfig)
+	if err != nil {
+		fmt.Println(err.Error())
+		return
+	}
+	defer dbConn.Close()
+
 	customPrefix := ""
 	params := a.GetAll()
 	if len(params) > 0 {
 		customPrefix = params[0]
 	}
 
-	err := migrator.AddNewMigrationFiles(migrationFilePath, customPrefix)
+	err = m.AddNewMigrationFiles(customPrefix)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
 	}
 }
 
-func constructMigratorOptions(a args.CommandArger, dbConfig db.DBFactoryer) (*sql.DB, migrator.MigrationProvider, string, int, error) {
+func constructMigratorOptions(a args.CommandArger, dbConfig db.DBFactoryer) (*sql.DB, migrator.DBMigrator, int, error) {
 	migrationFilePath := getMigrationFilePath()
 	step := getStep(a)
 
 	dbConf, err := dbConfig.GetConnectionConfig()
 	if err != nil {
-		return nil, nil, "", 0, err
+		return nil, nil, 0, err
 	}
 
 	dbConn, err := sql.Open(dbConf.GetConnectionName(), dbConf.GetConnectionString())
 	if err != nil {
-		return nil, nil, "", 0, err
+		return nil, nil, 0, err
 	}
 
-	MigrationProvider, err := migrator.NewMigrationProvider("db", "", dbConn)
-	if err != nil {
-		return nil, nil, "", 0, err
-	}
+	newMigrator := migrator.New(dbConn, migrationFilePath, "gofra")
+	newMigrator.SubscribeToMessages(func(et int, msg string) {
+		fmt.Println(decorateMessage(et, msg))
+	})
 
-	return dbConn, MigrationProvider, migrationFilePath, step, nil
+	return dbConn, newMigrator, step, nil
 }
 
 func getStep(a args.CommandArger) int {
@@ -127,4 +134,29 @@ func getMigrationFilePath() string {
 	}
 
 	return defaultMigrationFilePath
+}
+
+// DecorateMessage will return a message with the correct context from the event type and message
+func decorateMessage(eventType int, message string) string {
+	if formattedMsg, exists := getMessageFormat(eventType); exists {
+		return fmt.Sprintf(formattedMsg, message)
+	}
+
+	return message
+}
+
+// getMessageFormat returns the message format string based on the event type.
+func getMessageFormat(eventType int) (string, bool) {
+	messages := map[int]string{
+		config.MigratedItems:        "Migrated %s items",
+		config.NothingToRollback:    "Nothing to roll back%s",
+		config.RolledBack:           "Rolled back %s items",
+		config.RunningMigrations:    "Running migration: %s",
+		config.SkipRollback:         "Skip rollback as file '%s' not exists",
+		config.RunningRollback:      "Running rollback %s",
+		config.MigrationFileCreated: "Migration file created: %s",
+	}
+
+	format, exists := messages[eventType]
+	return format, exists
 }

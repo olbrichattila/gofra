@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 
 	"slices"
 
 	"github.com/olbrichattila/gofra/pkg/app/gofraerror"
+	"github.com/olbrichattila/gofra/pkg/app/logger"
 	"github.com/olbrichattila/gofra/pkg/app/request"
 	"github.com/olbrichattila/gofra/pkg/app/router"
 	"github.com/olbrichattila/gofra/pkg/app/session"
@@ -27,15 +28,29 @@ type hTTPHandler struct {
 	customValidator validator.Validator
 	session         session.Sessioner
 	requester       request.Requester
+	logger          logger.Logger
 }
 
 func (h *hTTPHandler) ServeHTTP(
 	w http.ResponseWriter,
 	r *http.Request,
 ) {
+	defer func() {
+		if err := recover(); err != nil {
+			buf := make([]byte, 4096)
+			n := runtime.Stack(buf, false)
+			stackTrace := string(buf[:n])
+			h.logCritical(fmt.Sprintf("error: %v\nStack Trace:\n%s\n", err, stackTrace))
+			fmt.Printf("error: %v\nStack Trace:\n%s\n", err, stackTrace)
+
+			h.renderGofraError(w, err.(error))
+		}
+	}()
+
 	h.initRoutes()
 	h.initValidator()
 	h.initSession(w, r)
+	h.initLogger()
 
 	h.app.di.Set("http.ResponseWriter", w)
 	if h.runMiddlewares(h.app.conf.Middlewares()) {
@@ -275,12 +290,17 @@ func (h *hTTPHandler) initSession(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (h *hTTPHandler) initLogger() {
+	h.logger = h.getLoggerFromDi()
+}
+
 func (h *hTTPHandler) runMiddlewares(middlewares []interface{}) bool {
 	for _, middleware := range middlewares {
 		res, err := h.app.di.Call(middleware)
 		if err != nil {
 			fmt.Println(err.Error())
-			os.Exit(1)
+			// Log instead
+			h.logger.Error(err.Error())
 		}
 
 		if len(res) > 0 && res[0].Kind() == reflect.Bool {
@@ -456,6 +476,48 @@ func (h *hTTPHandler) getViewFromDi() view.Viewer {
 	}
 
 	return nil
+}
+
+func (h *hTTPHandler) getLoggerFromDi() logger.Logger {
+	dep, err := h.app.di.GetDependency("olbrichattila.gofra.pkg.app.logger.Logger")
+	if err == nil {
+		if req, ok := dep.(logger.Logger); ok {
+			return req
+		}
+
+		if dep, ok := dep.(func() any); ok {
+			resolvedDep := dep()
+			if req, ok := resolvedDep.(logger.Logger); ok {
+				return req
+			}
+		}
+	}
+
+	return nil
+}
+
+func (h *hTTPHandler) logWarning(message string) {
+	if h.logger != nil {
+		h.logger.Warning(message)
+	}
+}
+
+func (h *hTTPHandler) logInfo(message string) {
+	if h.logger != nil {
+		h.logger.Info(message)
+	}
+}
+
+func (h *hTTPHandler) logCritical(message string) {
+	if h.logger != nil {
+		h.logger.Critical(message)
+	}
+}
+
+func (h *hTTPHandler) logError(message string) {
+	if h.logger != nil {
+		h.logger.Error(message)
+	}
 }
 
 func (h *hTTPHandler) mergeValidationErrors(errorSet1, errorSet2 validator.ValidationErrors) validator.ValidationErrors {

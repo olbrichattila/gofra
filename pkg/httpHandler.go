@@ -43,7 +43,14 @@ func (h *hTTPHandler) ServeHTTP(
 			h.logCritical(fmt.Sprintf("error: %v\nStack Trace:\n%s\n", err, stackTrace))
 			fmt.Printf("error: %v\nStack Trace:\n%s\n", err, stackTrace)
 
-			h.renderGofraError(w, err.(error))
+			switch v := err.(type) {
+			case error:
+				h.renderGofraError(w, v)
+			case string:
+				h.renderGofraError(w, fmt.Errorf("%s", err))
+			default:
+				h.renderGofraError(w, fmt.Errorf("unknown panic: %v", v))
+			}
 		}
 	}()
 
